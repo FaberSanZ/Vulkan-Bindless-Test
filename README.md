@@ -1,2 +1,1 @@
-# VulkanTutorial.NET
-VulkanTutorial
+# Vulkan-Bindless Test
