@@ -249,7 +249,7 @@ namespace App
                     deviceFeatures2.pNext = &rtAccelerationFeatures;
 
                     vkGetPhysicalDeviceFeatures2KHR(physicalDevicesPtr[i], out deviceFeatures2);
-                    Console.Write("Use " + deviceName);
+                    Console.WriteLine("Use " + deviceName);
 
                     if (rtAccelerationFeatures.accelerationStructure)
                     {
@@ -285,33 +285,73 @@ namespace App
             string[] layers = new string[]
             {
                 "VK_KHR_swapchain",
+                "VK_KHR_acceleration_structure",
+                "VK_KHR_ray_tracing_pipeline",
+                "VK_EXT_descriptor_indexing",
+                "VK_KHR_buffer_device_address",
+                "VK_KHR_deferred_host_operations",
+                "VK_KHR_spirv_1_4",
+                "VK_KHR_shader_float_controls",
             };
 
             byte** extensionsToEnableArray = new VkStringArray(layers);
 
             VkPhysicalDeviceFeatures deviceFeatures = new VkPhysicalDeviceFeatures();
 
+
+
+            // chain multiple features required for RT into deviceInfo.pNext
+
+            // require buffer device address feature
+            VkPhysicalDeviceBufferDeviceAddressFeatures deviceBufferDeviceAddressFeatures = new VkPhysicalDeviceBufferDeviceAddressFeatures()
+            {
+                sType = VkStructureType.PhysicalDeviceBufferDeviceAddressFeatures,
+                bufferDeviceAddress = true,
+                pNext = null,
+            };
+
+            // require ray tracing pipeline feature
+            VkPhysicalDeviceRayTracingPipelineFeaturesKHR deviceRayTracingPipelineFeatures = new VkPhysicalDeviceRayTracingPipelineFeaturesKHR()
+            {
+                sType = VkStructureType.PhysicalDeviceRayTracingPipelineFeaturesKHR,
+                pNext = &deviceBufferDeviceAddressFeatures,
+                rayTracingPipeline = true,
+            };
+
+            // require acceleration structure feature
+            VkPhysicalDeviceAccelerationStructureFeaturesKHR deviceAccelerationStructureFeatures = new VkPhysicalDeviceAccelerationStructureFeaturesKHR()
+            {
+                sType = VkStructureType.PhysicalDeviceAccelerationStructureFeaturesKHR,
+                accelerationStructure = true,
+                pNext = &deviceRayTracingPipelineFeatures,
+            };
+
+            VkPhysicalDeviceVulkan12Features deviceVulkan12Features = new VkPhysicalDeviceVulkan12Features()
+            {
+                sType = VkStructureType.PhysicalDeviceVulkan12Features,
+                pNext = &deviceAccelerationStructureFeatures,
+                bufferDeviceAddress = true,
+            };
+
+
+
             VkDeviceCreateInfo createInfo = new VkDeviceCreateInfo()
             {
                 sType = VkStructureType.DeviceCreateInfo,
                 ppEnabledExtensionNames = extensionsToEnableArray,
-                enabledExtensionCount = 1, // TODO: swapchain
+                enabledExtensionCount = 8, // TODO: swapchain
                 pQueueCreateInfos = queueCreateInfos,
                 queueCreateInfoCount = 1,
+                pNext = &deviceVulkan12Features,
                 pEnabledFeatures = &deviceFeatures,
             };
 
             vkCreateDevice(physicalDevice, &createInfo, null, out device);
 
-
-
-            //for (int i = 0; i < extensionsCount; i++)
-            //{
-            //    Marshal.FreeHGlobal(extensionsToEnableArray[i]);
-            //}
-
             vkGetDeviceQueue(device, (uint)indices.GraphicsFamily, 0, out graphicsQueue);
             vkGetDeviceQueue(device, (uint)indices.PresentFamily, 0, out presentQueue);
+
+
         }
 
 
