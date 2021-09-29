@@ -121,7 +121,7 @@ namespace App
 
         private const int Width = 800;
         private const int Height = 600;
-        private string Title = "Vulkan";
+        private string Title = "Vulkan Ray";
 
         public void Run()
         {
