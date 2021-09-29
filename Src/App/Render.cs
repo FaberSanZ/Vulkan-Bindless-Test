@@ -173,13 +173,19 @@ namespace App
             createInfo.sType = VkStructureType.InstanceCreateInfo;
             createInfo.pApplicationInfo = &appInfo;
 
-            uint glfwExtensionCount = 0;
-            byte** glfwExtensions = glfw.GetRequiredInstanceExtensions(out glfwExtensionCount);
+            string[] arr = new[]
+            {
+                "VK_KHR_win32_surface",
+                "VK_KHR_surface",
+                "VK_KHR_get_physical_device_properties2",
+            };
 
-            createInfo.enabledExtensionCount = glfwExtensionCount;
-            createInfo.ppEnabledExtensionNames = glfwExtensions;
+            VkStringArray ext = new VkStringArray(arr);
 
-            createInfo.enabledLayerCount = 0;
+            createInfo.enabledExtensionCount = ext.Length;
+            createInfo.ppEnabledExtensionNames = (byte**)ext;
+
+            //createInfo.enabledLayerCount = 0;
 
             vkCreateInstance(&createInfo, null, out instance).CheckResult();
             vkLoadInstance(instance);
@@ -202,15 +208,59 @@ namespace App
             vkCreateWin32SurfaceKHR(instance, &windowsSurfaceInfo, null, out surface).CheckResult();
         }
 
+        internal unsafe ReadOnlySpan<VkExtensionProperties> Instance_Extensions()
+        {
+            uint count = 0;
+            vkEnumerateInstanceExtensionProperties(null, &count, null).CheckResult();
+
+            ReadOnlySpan<VkExtensionProperties> properties = new VkExtensionProperties[count];
+            fixed (VkExtensionProperties* ptr = properties)
+            {
+                vkEnumerateInstanceExtensionProperties(null, &count, ptr).CheckResult();
+            }
+
+            return properties;
+        }
+
 
         private void CreatePhysicalDevice()
         {
-            uint deviceCount = 0;
-            vkEnumeratePhysicalDevices(instance, &deviceCount, null);
-            VkPhysicalDevice* physicalDevicesPtr = stackalloc VkPhysicalDevice[(int)deviceCount];
-            vkEnumeratePhysicalDevices(instance, &deviceCount, physicalDevicesPtr);
 
-            physicalDevice = physicalDevicesPtr[0]; // default  GPU
+
+            uint device_count = 0;
+            vkEnumeratePhysicalDevices(instance, &device_count, null);
+            VkPhysicalDevice* physicalDevicesPtr = stackalloc VkPhysicalDevice[(int)device_count];
+            vkEnumeratePhysicalDevices(instance, &device_count, physicalDevicesPtr);
+
+            for (int i = 0; i < device_count; i++)
+            {
+                vkGetPhysicalDeviceProperties(physicalDevicesPtr[i], out var properties);
+                string deviceName = properties.GetDeviceName();
+
+                if (properties.deviceType != VkPhysicalDeviceType.IntegratedGpu)
+                {
+                    VkPhysicalDeviceAccelerationStructureFeaturesKHR rtAccelerationFeatures = new()
+                    {
+                        sType = VkStructureType.PhysicalDeviceAccelerationStructureFeaturesKHR
+                    };
+
+                    VkPhysicalDeviceFeatures2 deviceFeatures2 = new();
+                    deviceFeatures2.sType = VkStructureType.PhysicalDeviceFeatures2;
+                    deviceFeatures2.pNext = &rtAccelerationFeatures;
+
+                    vkGetPhysicalDeviceFeatures2KHR(physicalDevicesPtr[i], out deviceFeatures2);
+                    Console.Write("Use " + deviceName);
+
+                    if (rtAccelerationFeatures.accelerationStructure)
+                    {
+                        physicalDevice = physicalDevicesPtr[i];
+                        break;
+                    }
+                }
+
+ 
+
+            }
         }
 
 
